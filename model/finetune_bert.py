@@ -1,54 +1,15 @@
+import re
+
 import matplotlib.pyplot as plt
 import pandas as pd
-import torch
-from torchtext.data import Field, TabularDataset, BucketIterator, Iterator
-import torch.nn as nn
-from transformers import BertTokenizer, BertForSequenceClassification, BertConfig
-import torch.optim as optim
-import re
-from sklearn.model_selection import train_test_split
-import sklearn.metrics as metrics
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import seaborn as sns
-
+import sklearn.metrics as metrics
+import torch
+import torch.nn as nn
+from sklearn.metrics import classification_report, confusion_matrix
+from transformers import BertForSequenceClassification
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
-train_data = pd.read_csv('../data/EQ2-Data/covid_train.csv')
-valid_data = pd.read_csv('../data/EQ2-Data/news_test.csv')
-
-tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-
-def text_cleaning(text):
-    text = re.sub("[^a-zA-Z]", " ", text) # removing punctuation
-    return text
-
-train_data['text'] = train_data['text'].apply(text_cleaning)
-valid_data['text'] = valid_data['text'].apply(text_cleaning)
-
-val_split, test_split = train_test_split(valid_data,test_size = 0.5)
-
-train_data.to_csv("../data/EQ2-Data/processed_splits/covid_train.csv", index=False)
-val_split.to_csv("../data/EQ2-Data/processed_splits/news_valid.csv", index=False)
-test_split.to_csv("../data/EQ2-Data/processed_splits/news_test.csv", index=False)
-
-MAX_SEQ_LEN = 256
-PAD_INDEX = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
-UNK_INDEX = tokenizer.convert_tokens_to_ids(tokenizer.unk_token)
-
-label_field = Field(sequential=False, use_vocab=False, batch_first=True, dtype=torch.float)
-text_field = Field(use_vocab=False, tokenize=tokenizer.encode, lower=False, include_lengths=False, batch_first=True,
-                   fix_length=MAX_SEQ_LEN, pad_token=PAD_INDEX, unk_token=UNK_INDEX)
-fields = [('text', text_field), ('label', label_field)]
-
-train, valid, test = TabularDataset.splits(path="../data/EQ2-Data/processed_splits/", train='covid_train.csv', validation='news_valid.csv',
-                                           test='news_test.csv', format='CSV', fields=fields, skip_header=True)
-
-train_iter = BucketIterator(train, batch_size=16, sort_key=lambda x: len(x.text),
-                            device=device, train=True, sort=True, sort_within_batch=True)
-valid_iter = BucketIterator(valid, batch_size=16, sort_key=lambda x: len(x.text),
-                            device=device, train=True, sort=True, sort_within_batch=True)
-test_iter = Iterator(test, sort_key = None, batch_size=16, device=device, train=False, shuffle=False, sort=False)
 
 class BERT(nn.Module):
 
@@ -103,7 +64,6 @@ def save_metrics(save_path, train_loss_list, valid_loss_list, global_steps_list)
     torch.save(state_dict, save_path)
     print(f'Model saved to ==> {save_path}')
 
-
 def load_metrics(load_path, device):
 
     if load_path==None:
@@ -116,12 +76,14 @@ def load_metrics(load_path, device):
 
 def train(model,
           optimizer,
+          train_loader,
+          valid_loader,
+          num_epochs,
+          eval_every,
+          model_name,
           criterion = nn.BCELoss(),
-          train_loader = train_iter,
-          valid_loader = valid_iter,
-          num_epochs = 5,
-          eval_every = len(train_iter) // 2,
-          file_path = "./",
+          model_path = "runners/model_weights/",
+          metrics_path = "runners/model_metrics/",
           best_valid_loss = float("Inf")):
     
     # initialize running values
@@ -187,33 +149,21 @@ def train(model,
                 # checkpoint
                 if best_valid_loss > average_valid_loss:
                     best_valid_loss = average_valid_loss
-                    save_checkpoint(file_path + '/' + 'model.pt', model, best_valid_loss)
-                    save_metrics(file_path + '/' + 'model_metrics.pt', train_loss_list, valid_loss_list, global_steps_list)
+                    save_checkpoint(model_path + model_name + '.pt', model, best_valid_loss)
+                    save_metrics(metrics_path + model_name + '_metrics.pt', train_loss_list, valid_loss_list, global_steps_list)
     
-    save_metrics(file_path + '/' + 'model_metrics.pt', train_loss_list, valid_loss_list, global_steps_list)
+    save_metrics(metrics_path + 'model_metrics.pt', train_loss_list, valid_loss_list, global_steps_list)
     print('Finished Training!')
 
-torch.cuda.empty_cache()
+def plot_loss(global_steps_list, train_loss_list, valid_loss_list, plot_name):
+    plt.plot(global_steps_list, train_loss_list, label='Train')
+    plt.plot(global_steps_list, valid_loss_list, label='Valid')
+    plt.xlabel('Global Steps')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.savefig('runners/plots/' + plot_name + '_loss.png')
 
-import gc
-#del variables
-gc.collect()
-
-model = BERT().to(device)
-optimizer = optim.Adam(model.parameters(), lr=2e-5)
-
-train(model=model, optimizer=optimizer)
-
-destination_folder = "." # TODO: check that this is where your saved model is
-train_loss_list, valid_loss_list, global_steps_list = load_metrics(destination_folder + '/model_metrics.pt', device)
-plt.plot(global_steps_list, train_loss_list, label='Train')
-plt.plot(global_steps_list, valid_loss_list, label='Valid')
-plt.xlabel('Global Steps')
-plt.ylabel('Loss')
-plt.legend()
-plt.show() 
-
-def evaluate(model, test_loader):
+def evaluate(model, test_loader, plot_name):
     y_pred = []
     y_true = []
 
@@ -234,7 +184,9 @@ def evaluate(model, test_loader):
                 y_true.extend(labels.tolist())
     
     print('Classification Report:')
-    print(classification_report(y_true, y_pred, labels=[1,0], digits=4))
+    report = classification_report(y_true, y_pred, labels=[1,0], digits=4, output_dict=True)
+    df = pd.DataFrame(report).transpose()
+    df.to_csv('runners/classification_reports/' + plot_name + '_report.csv')
     
     cm = confusion_matrix(y_true, y_pred, labels=[1,0])
     ax= plt.subplot()
@@ -252,19 +204,10 @@ def evaluate(model, test_loader):
     fpr, tpr, thresholds = metrics.roc_curve(y_true, y_pred)
     roc_auc = metrics.auc(fpr, tpr)
     display = metrics.RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc)
-    display.plot(name="add-some-name-here") 
-    plt.show() 
+    display.plot(name=plot_name) 
+    plt.savefig('runners/plots/' + plot_name + '_roc.png') 
 
+def text_cleaning(text):
+    text = re.sub("[^a-zA-Z]", " ", text) # removing punctuation
+    return text
 
-torch.cuda.empty_cache()
-
-import gc
-#del variables
-gc.collect()
-
-MODEL_NAME = "/model.pt"  #change accordingly
-
-best_model = BERT().to(device)
-
-loaded_model = load_checkpoint(load_path=destination_folder + MODEL_NAME, model = best_model, device=device)
-evaluate(loaded_model, test_iter)
