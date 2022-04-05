@@ -11,8 +11,8 @@ from transformers import BertTokenizer
 
 warnings.filterwarnings("ignore")
 
-MODEL_NAME = 'NEWS_COVID19'
-TRAINING_DATA = 'news'
+MODEL_NAME = 'SBIRS_COVID19'
+TRAINING_DATA = 'sbirs'
 TESTING_DATA = 'covid'
 
 TRAIN_DATASET = 'data/EQ2-Data/' + TRAINING_DATA + '_train.csv'

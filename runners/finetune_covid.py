@@ -12,6 +12,13 @@ from transformers import BertTokenizer
 warnings.filterwarnings("ignore")
 
 MODEL_NAME = 'COVID19_SBIRS'
+TRAINING_DATA = 'covid'
+TESTING_DATA = 'sbirs'
+
+TRAIN_DATASET = 'data/EQ2-Data/' + TRAINING_DATA + '_train.csv'
+TEST_DATASET = 'data/EQ2-Data/' + TESTING_DATA + '_test.csv'  
+
+NUM_EPOCHS = 10
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -21,25 +28,25 @@ MAX_SEQ_LEN = 256
 PAD_INDEX = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
 UNK_INDEX = tokenizer.convert_tokens_to_ids(tokenizer.unk_token)
 
-train_data = pd.read_csv('data/EQ2-Data/covid_train.csv')
-valid_data = pd.read_csv('data/EQ2-Data/news_test.csv')
+train_data = pd.read_csv(TRAIN_DATASET)
+test_data = pd.read_csv(TEST_DATASET)
 
 train_data['text'] = train_data['text'].apply(text_cleaning)
-valid_data['text'] = valid_data['text'].apply(text_cleaning)
+test_data['text'] = test_data['text'].apply(text_cleaning)
 
-val_split, test_split = train_test_split(valid_data,test_size = 0.5)
+train_split, val_split = train_test_split(train_data,test_size = 0.2)
 
-train_data.to_csv("data/EQ2-Data/processed_splits/covid_train.csv", index=False)
-val_split.to_csv("data/EQ2-Data/processed_splits/news_valid.csv", index=False)
-test_split.to_csv("data/EQ2-Data/processed_splits/news_test.csv", index=False)
+train_split.to_csv("data/EQ2-Data/processed_splits/" + TRAINING_DATA + "_train.csv", index=False)
+val_split.to_csv("data/EQ2-Data/processed_splits/" + TRAINING_DATA + "_valid.csv", index=False)
+test_data.to_csv("data/EQ2-Data/processed_splits/" + TESTING_DATA + "_test.csv", index=False)
 
 label_field = Field(sequential=False, use_vocab=False, batch_first=True, dtype=torch.float)
 text_field = Field(use_vocab=False, tokenize=tokenizer.encode, lower=False, include_lengths=False, batch_first=True,
                    fix_length=MAX_SEQ_LEN, pad_token=PAD_INDEX, unk_token=UNK_INDEX)
 fields = [('text', text_field), ('label', label_field)]
 
-trained, valid, test = TabularDataset.splits(path="data/EQ2-Data/processed_splits/", train='covid_train.csv', validation='news_valid.csv',
-                                           test='news_test.csv', format='CSV', fields=fields, skip_header=True)
+trained, valid, test = TabularDataset.splits(path="data/EQ2-Data/processed_splits/", train=TRAINING_DATA + '_train.csv', validation=TRAINING_DATA + '_valid.csv',
+                                           test=TESTING_DATA + '_test.csv', format='CSV', fields=fields, skip_header=True)
 
 train_iter = BucketIterator(trained, batch_size=16, sort_key=lambda x: len(x.text),
                             device=device, train=True, sort=True, sort_within_batch=True)
@@ -53,7 +60,7 @@ gc.collect()
 model = BERT().to(device)
 optimizer = optim.Adam(model.parameters(), lr=2e-5)
 
-train(model=model, optimizer=optimizer, train_loader=train_iter, valid_loader=valid_iter, num_epochs=1, eval_every=len(train_iter)//2, model_name=MODEL_NAME)
+train(model=model, optimizer=optimizer, train_loader=train_iter, valid_loader=valid_iter, num_epochs=NUM_EPOCHS, eval_every=len(train_iter)//2, model_name=MODEL_NAME)
 
 metrics_folder = "runners/model_metrics/"
 train_loss_list, valid_loss_list, global_steps_list = load_metrics(metrics_folder + MODEL_NAME + '_metrics.pt', device)
