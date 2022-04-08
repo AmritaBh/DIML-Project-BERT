@@ -12,10 +12,10 @@ We test performance of each on all the domains.
 Runners:
 
 <ol>
+
     <li> Finetune on Covid-19 and test on:
         <ul>
-            <li> Covid-19</li>
-            <li> SBIRs</li>
+             <li> SBIRs</li>
             <li> News articles</li>
             <li> webtext</li>
         </ul>
@@ -24,7 +24,6 @@ Runners:
     <li> Finetune on SBIRs and test on:
         <ul>
             <li> Covid-19</li>
-            <li> SBIRs</li>
             <li> News articles</li>
             <li> webtext</li>
         </ul>
@@ -34,7 +33,6 @@ Runners:
         <ul>
             <li> Covid-19</li>
             <li> SBIRs</li>
-            <li> News articles</li>
             <li> webtext</li>
         </ul>
     </li>
@@ -44,7 +42,7 @@ Runners:
             <li> Covid-19</li>
             <li> SBIRs</li>
             <li> News articles</li>
-            <li> webtext</li>
         </ul>
     </li>
+
 </ol>
