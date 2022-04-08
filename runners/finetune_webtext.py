@@ -11,9 +11,9 @@ from transformers import BertTokenizer
 
 warnings.filterwarnings("ignore")
 
-MODEL_NAME = 'WEBTEXT_COVID19'
+MODEL_NAME = 'WEBTEXT_SBIRS'
 TRAINING_DATA = 'webtext'
-TESTING_DATA = 'covid'
+TESTING_DATA = 'sbirs'
 
 TRAIN_DATASET = 'data/EQ2-Data/' + TRAINING_DATA + '_train.csv'
 TEST_DATASET = 'data/EQ2-Data/' + TESTING_DATA + '_test.csv'  
