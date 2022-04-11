@@ -11,22 +11,38 @@ We test performance of each on all the domains.
 
 Runners:
 
-1. Finetune on Covid-19 and test on:
-    a. SBIRs
-    b. News articles
-    c. Webtext
+<ol>
 
-2. Finetune on SBIRs and test on:
-    a. Covid-19
-    b. News articles
-    c. Webtext
+    <li> Finetune on Covid-19 and test on:
+        <ul>
+             <li> SBIRs</li>
+            <li> News articles</li>
+            <li> webtext</li>
+        </ul>
+    </li>
 
-3. Finetune on News articles and test on:
-    a. Covid-19
-    b. SBIRs
-    c. Webtext
+    <li> Finetune on SBIRs and test on:
+        <ul>
+            <li> Covid-19</li>
+            <li> News articles</li>
+            <li> webtext</li>
+        </ul>
+    </li>
 
-4. Finetune on Webtext and test on:
-    a. Covid-19
-    b. SBIRs
-    c. News articles
+    <li> Finetune on News articles and test on:
+        <ul>
+            <li> Covid-19</li>
+            <li> SBIRs</li>
+            <li> webtext</li>
+        </ul>
+    </li>
+
+    <li> Finetune on Webtext and test on:
+        <ul>
+            <li> Covid-19</li>
+            <li> SBIRs</li>
+            <li> News articles</li>
+        </ul>
+    </li>
+
+</ol>
